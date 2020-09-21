@@ -166,3 +166,27 @@ func MonitoringQTApp() {
 	cmd := exec.Command("/bin/bash", "-c", command)
 	_ = cmd.Run()
 }
+
+func UpdateGivenBackEnd(c *gin.Context) {
+	command := "./scripts/update_backend.sh"
+	err := exec.Command("/bin/bash", "-c", command).Run()
+	if err != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "执行更新脚本出错")
+		return
+	}
+	c.String(http.StatusOK, "更新成功")
+}
+
+func UpdateGivenQtApp(c *gin.Context) {
+	Get().DelByID("MonitoringQTApp")
+	//3.升级程序
+	command := "./scripts/update_qt.sh"
+	err := exec.Command("/bin/bash", "-c", command).Run()
+	if err != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "执行更新脚本出错")
+	}
+	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
+	c.String(http.StatusOK, "更新成功")
+}
