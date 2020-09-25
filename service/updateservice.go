@@ -21,6 +21,7 @@ const (
 func UpdateBackEnd(c *gin.Context) {
 	gatewayAddr := c.GetHeader("gateway_addr")
 	buildAtStr := c.GetHeader("build_at")
+
 	if gatewayAddr == "" || buildAtStr == "" {
 		log.Error("空参数")
 		c.String(http.StatusForbidden, "空参数")
@@ -33,19 +34,19 @@ func UpdateBackEnd(c *gin.Context) {
 		return
 	}
 
-	//1.版本检查
+	//1.版本检查，传入当前版本的时间，然后获取网关最新版本，如果落后就返回true
 	if !checkBackEndVersion(gatewayAddr, buildAt, "lcrtu") {
 		log.Error("已经升级到最新版程序")
 		c.String(http.StatusForbidden, "版本检查失败")
 		return
 	}
-	//2.下载版本
+	//2.下载版本,
 	if !downLatestVersion(gatewayAddr, "lcrtu") {
 		log.Error("下载最新版程序出错")
 		c.String(http.StatusForbidden, "下载最新程序失败")
 		return
 	}
-	//3.升级程序
+	//3.执行升级程序命令
 	command := "./scripts/update_backend.sh"
 	err = exec.Command("/bin/bash", "-c", command).Run()
 	if err != nil {
@@ -55,6 +56,7 @@ func UpdateBackEnd(c *gin.Context) {
 	}
 	c.String(http.StatusOK, "更新成功")
 }
+
 func UpdateQtApp(c *gin.Context) {
 	gatewayAddr := c.GetHeader("gateway_addr")
 	buildAtStr := c.GetHeader("build_at")
@@ -87,6 +89,8 @@ func UpdateQtApp(c *gin.Context) {
 }
 
 func downLatestVersion(gatewayAddr string, updateType string) bool {
+
+	//1.向网关发起请求，下载最新的压缩包
 	remoteAddr := "http://" + gatewayAddr + "/api/software/latest?mode=download&type=" + updateType
 	resp, err := http.Get(remoteAddr)
 	if err != nil {
@@ -98,11 +102,14 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 		log.Error("服务器拒绝下载：", resp.StatusCode)
 		return false
 	}
+
+	//2.获取返回值中压缩包的md5值
 	fileMd5Str := resp.Header.Get("file_md5")
 	if fileMd5Str == "" {
 		log.Error("file_md5字段为空")
 		return false
 	}
+	//3.将返回体中的文件下载到本地
 	err = os.MkdirAll(FILE_PATH, os.ModePerm)
 	if err != nil {
 		log.Error("创建tmp目录失败:", err)
@@ -129,7 +136,7 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 		log.Error("generate md5 error ", err)
 		return false
 	}
-
+	//4.计算下载后的md5值，比较，相等返回true
 	md5Str := hex.EncodeToString(md5.Sum(nil))
 	if md5Str != fileMd5Str {
 		log.Error("verify md5 error ", err)
@@ -139,6 +146,8 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 }
 
 func checkBackEndVersion(gatewayAddr string, buildAt time.Time, updateType string) bool {
+
+	//获取最新版本
 	remoteAddr := "http://" + gatewayAddr + "/api/software/latest?mode=version&type=" + updateType
 	resp, err := http.Get(remoteAddr)
 	if err != nil {
@@ -156,6 +165,8 @@ func checkBackEndVersion(gatewayAddr string, buildAt time.Time, updateType strin
 		log.Error("build_at字段类型错误:", latestBuildAtStr)
 		return false
 	}
+
+	//当前版本的时间早于最新的版本时间，返回true
 	if buildAt.Before(latestBuildAt) {
 		return true
 	}
@@ -168,9 +179,49 @@ func MonitoringQTApp() {
 }
 
 func UpdateGivenBackEnd(c *gin.Context) {
-	command := "./scripts/update_backend.sh"
-	err := exec.Command("/bin/bash", "-c", command).Run()
+
+	fileId := c.Query("file_id")
+	if fileId == "" {
+		log.Error("执行更新脚本出错：id不能为空")
+		c.String(http.StatusForbidden, "获取新版文件出错,id不能为空")
+		return
+	}
+
+	//1.向网关下载特定版本的压缩包
+	getRes, getErr := http.Get("172.20.0.70:9002/api/rtu_update/special_version?rtu_id=" + fileId)
+	if getErr != nil {
+		log.Error("执行更新脚本出错：", getErr.Error())
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
+	}
+	///mnt/mmc/tmp/lcrtu
+	//将文件下载到本地,重命名压缩包
+	out, err := os.Create("/mnt/mmc/lcrtu.zip")
 	if err != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
+	}
+	defer out.Close()
+	var fileBytes []byte
+	_, fileErr := getRes.Body.Read(fileBytes)
+	if fileErr != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
+	}
+	writeCount, writeErr := out.Write(fileBytes)
+	println("写入数量：", writeCount)
+	if writeErr != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
+	}
+
+	//3.执行更新脚本
+	command := "./scripts/update_backend.sh"
+	execErr := exec.Command("/bin/bash", "-c", command).Run()
+	if execErr != nil {
 		log.Error("执行更新脚本出错：", err)
 		c.String(http.StatusForbidden, "执行更新脚本出错")
 		return
