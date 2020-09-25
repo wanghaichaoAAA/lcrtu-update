@@ -3,19 +3,22 @@ package service
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
 var log = logging.MustGetLogger("service")
 
 const (
-	FILE_PATH = "/mnt/mmc/tmp"
+	//FILE_PATH = "/mnt/mmc/tmp"
+	FILE_PATH = "./tmp"
 )
 
 func UpdateBackEnd(c *gin.Context) {
@@ -89,6 +92,11 @@ func UpdateQtApp(c *gin.Context) {
 }
 
 func downLatestVersion(gatewayAddr string, updateType string) bool {
+	var (
+		fsize   int64
+		buf     = make([]byte, 1024*1024*1024)
+		written int64
+	)
 
 	//1.向网关发起请求，下载最新的压缩包
 	remoteAddr := "http://" + gatewayAddr + "/api/update/program?mode=download&type=" + updateType
@@ -97,12 +105,20 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 		log.Error("下载最新版本出错：", err)
 		return false
 	}
+	if resp.Body == nil {
+		log.Error("返回为空")
+		return false
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		log.Error("服务器拒绝下载：", resp.StatusCode)
 		return false
 	}
-
+	fsize, err = strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 32)
+	if err != nil {
+		log.Error("获取Content-Length失败：", err)
+		return false
+	}
 	//2.获取返回值中压缩包的md5值
 	fileMd5Str := resp.Header.Get("file_md5")
 	if fileMd5Str == "" {
@@ -123,11 +139,35 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 		return false
 	}
 	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
-	if err != nil {
-		log.Error("copy resp.Body to ", filePath, " error ", err)
-		return false
+	fmt.Println("-----------------------开始下载:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
+	for {
+		nr, err := resp.Body.Read(buf)
+		if (err != nil && err != io.EOF) || nr <= 0 {
+			break
+		}
+		nw, ew := f.Write(buf[0:nr])
+		//写入出错
+		if ew != nil {
+			log.Error("写入本地文件出错：", err)
+			break
+		}
+		//读取是数据长度不等于写入的数据长度
+		if nr != nw {
+			log.Error("写入本地文件的数据长度出错")
+			break
+		}
+		if nw > 0 {
+			written += int64(nw)
+		}
+		fmt.Print(fmt.Sprintf("%.0f", float32(written)/float32(fsize)*100), "% ")
 	}
+	fmt.Println()
+	fmt.Println("-----------------------下载结束:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
+	//_, err = io.Copy(f, resp.Body)
+	//if err != nil {
+	//	log.Error("copy resp.Body to ", filePath, " error ", err)
+	//	return false
+	//}
 
 	//fNew, _ := os.Open(filePath)
 	md5 := md5.New()

@@ -14,6 +14,7 @@ func StartHttp() {
 	//手动安装
 	router.GET("/update/given/lcrtu", UpdateGivenBackEnd)
 	router.GET("/update/given/qt", UpdateGivenQtApp)
+
 	err := router.Run(":9876")
 	if err != nil {
 		log.Info("start http server error")
