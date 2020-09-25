@@ -3,10 +3,12 @@ package service
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,8 +19,8 @@ import (
 var log = logging.MustGetLogger("service")
 
 const (
-	//FILE_PATH = "/mnt/mmc/tmp"
-	FILE_PATH = "./tmp"
+	FILE_PATH = "/mnt/mmc/tmp"
+	//FILE_PATH = "./tmp"
 )
 
 func UpdateBackEnd(c *gin.Context) {
@@ -218,6 +220,12 @@ func MonitoringQTApp() {
 	_ = cmd.Run()
 }
 
+type resStruct struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    []byte `json:"data"`
+}
+
 func UpdateGivenBackEnd(c *gin.Context) {
 
 	fileId := c.Query("file_id")
@@ -228,32 +236,35 @@ func UpdateGivenBackEnd(c *gin.Context) {
 	}
 
 	//1.向网关下载特定版本的压缩包
-	getRes, getErr := http.Get("172.20.0.70:9002/api/rtu_update/special_version?rtu_id=" + fileId)
+	getRes, getErr := http.Get("http://172.20.0.70:9002/api/rtu_update/special_version?rtu_id=" + fileId)
 	if getErr != nil {
 		log.Error("执行更新脚本出错：", getErr.Error())
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
-	///mnt/mmc/tmp/lcrtu
+	defer getRes.Body.Close()
+	body, _ := ioutil.ReadAll(getRes.Body)
+	var res resStruct
+	jsonErr := json.Unmarshal(body, &res)
+	if jsonErr != nil {
+		log.Error("解析数据出错：", jsonErr.Error())
+		c.String(http.StatusForbidden, "解析数据出错")
+		return
+	}
+
 	//将文件下载到本地,重命名压缩包
-	out, err := os.Create("/mnt/mmc/lcrtu.zip")
+	out, err := os.Create(FILE_PATH + "/lcrtu.zip")
 	if err != nil {
 		log.Error("执行更新脚本出错：", err)
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
 	defer out.Close()
-	var fileBytes []byte
-	_, fileErr := getRes.Body.Read(fileBytes)
-	if fileErr != nil {
-		log.Error("执行更新脚本出错：", err)
-		c.String(http.StatusForbidden, "获取新版文件出错")
-		return
-	}
-	writeCount, writeErr := out.Write(fileBytes)
+
+	writeCount, writeErr := out.Write(res.Data)
 	println("写入数量：", writeCount)
 	if writeErr != nil {
-		log.Error("执行更新脚本出错：", err)
+		log.Error("执行写入出错：", writeErr)
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
@@ -262,7 +273,7 @@ func UpdateGivenBackEnd(c *gin.Context) {
 	command := "./scripts/update_backend.sh"
 	execErr := exec.Command("/bin/bash", "-c", command).Run()
 	if execErr != nil {
-		log.Error("执行更新脚本出错：", err)
+		log.Error("执行更新脚本出错：", execErr)
 		c.String(http.StatusForbidden, "执行更新脚本出错")
 		return
 	}
@@ -270,14 +281,54 @@ func UpdateGivenBackEnd(c *gin.Context) {
 }
 
 func UpdateGivenQtApp(c *gin.Context) {
-	Get().DelByID("MonitoringQTApp")
-	//3.升级程序
-	command := "./scripts/update_qt.sh"
-	err := exec.Command("/bin/bash", "-c", command).Run()
+	fileId := c.Query("file_id")
+	if fileId == "" {
+		log.Error("执行更新脚本出错：id不能为空")
+		c.String(http.StatusForbidden, "获取新版文件出错,id不能为空")
+		return
+	}
+
+	//1.向网关下载特定版本的压缩包
+	getRes, getErr := http.Get("http://172.20.0.70:9002/api/qt_update/special_version?qt_id=" + fileId)
+	if getErr != nil {
+		log.Error("执行更新脚本出错：", getErr.Error())
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
+	}
+	defer getRes.Body.Close()
+	body, _ := ioutil.ReadAll(getRes.Body)
+	var res resStruct
+	jsonErr := json.Unmarshal(body, &res)
+	if jsonErr != nil {
+		log.Error("解析数据出错：", jsonErr.Error())
+		c.String(http.StatusForbidden, "解析数据出错")
+		return
+	}
+
+	//将文件下载到本地,重命名压缩包
+	out, err := os.Create(FILE_PATH + "/qtApp.zip")
 	if err != nil {
 		log.Error("执行更新脚本出错：", err)
-		c.String(http.StatusForbidden, "执行更新脚本出错")
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
 	}
-	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
+	defer out.Close()
+
+	writeCount, writeErr := out.Write(res.Data)
+	println("写入数量：", writeCount)
+	if writeErr != nil {
+		log.Error("执行写入出错：", writeErr)
+		c.String(http.StatusForbidden, "获取新版文件出错")
+		return
+	}
+
+	//3.执行更新脚本
+	command := "./scripts/update_qt.sh"
+	execErr := exec.Command("/bin/bash", "-c", command).Run()
+	if execErr != nil {
+		log.Error("执行更新脚本出错：", execErr)
+		c.String(http.StatusForbidden, "执行更新脚本出错")
+		return
+	}
 	c.String(http.StatusOK, "更新成功")
 }
