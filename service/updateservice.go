@@ -91,7 +91,7 @@ func UpdateQtApp(c *gin.Context) {
 func downLatestVersion(gatewayAddr string, updateType string) bool {
 
 	//1.向网关发起请求，下载最新的压缩包
-	remoteAddr := "http://" + gatewayAddr + "/api/software/latest?mode=download&type=" + updateType
+	remoteAddr := "http://" + gatewayAddr + "/api/update/program?mode=download&type=" + updateType
 	resp, err := http.Get(remoteAddr)
 	if err != nil {
 		log.Error("下载最新版本出错：", err)
@@ -148,7 +148,7 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 func checkBackEndVersion(gatewayAddr string, buildAt time.Time, updateType string) bool {
 
 	//获取最新版本
-	remoteAddr := "http://" + gatewayAddr + "/api/software/latest?mode=version&type=" + updateType
+	remoteAddr := "http://" + gatewayAddr + "/api/update/program?mode=version&type=" + updateType
 	resp, err := http.Get(remoteAddr)
 	if err != nil {
 		log.Error("请求网关获取版本接口出错：", err)
