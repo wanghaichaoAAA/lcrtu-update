@@ -20,7 +20,6 @@ var log = logging.MustGetLogger("service")
 
 const (
 	FILE_PATH = "/mnt/mmc/tmp"
-	//FILE_PATH = "./tmp"
 )
 
 func UpdateBackEnd(c *gin.Context) {
@@ -330,5 +329,30 @@ func UpdateGivenQtApp(c *gin.Context) {
 		c.String(http.StatusForbidden, "执行更新脚本出错")
 		return
 	}
+	c.String(http.StatusOK, "更新成功")
+}
+
+func UpdateLocalRtuApp(c *gin.Context) {
+	//3.升级程序
+	command := "./scripts/update_backend.sh"
+	err := exec.Command("/bin/bash", "-c", command).Run()
+	if err != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "执行更新脚本出错")
+	}
+	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
+	c.String(http.StatusOK, "更新成功")
+}
+
+func UpdateLocalQtApp(c *gin.Context) {
+	Get().DelByID("MonitoringQTApp")
+	//3.升级程序
+	command := "./scripts/update_qt.sh"
+	err := exec.Command("/bin/bash", "-c", command).Run()
+	if err != nil {
+		log.Error("执行更新脚本出错：", err)
+		c.String(http.StatusForbidden, "执行更新脚本出错")
+	}
+	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
 	c.String(http.StatusOK, "更新成功")
 }
