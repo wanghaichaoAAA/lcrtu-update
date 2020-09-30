@@ -42,7 +42,7 @@ func (c *Timer) AddByFunc(id string, second int, f func()) error {
 		return err
 	}
 	c.ids[id] = eid
-	log.Info("create scheduled task success,id=", id, " interval:", cronSpec)
+	serviceLog.Info("create scheduled task success,id=", id, " interval:", cronSpec)
 	return nil
 }
 
@@ -56,7 +56,7 @@ func (c *Timer) DelByID(id string) {
 	}
 	c.inner.Remove(eid)
 	delete(c.ids, id)
-	log.Info("delete scheduled task success,id:", id)
+	serviceLog.Info("delete scheduled task success,id:", id)
 }
 
 //删除整个定时器

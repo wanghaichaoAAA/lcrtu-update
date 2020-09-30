@@ -4,7 +4,10 @@
 */
 package main
 
-import "lcrtu-update/service"
+import (
+	_ "lcrtu-update/config"
+	"lcrtu-update/service"
+)
 
 func main() {
 	service.Get().Start()
