@@ -15,8 +15,7 @@ func StartHttp() {
 	router.GET("/update/given/lcrtu", UpdateGivenBackEnd)
 	router.GET("/update/given/qt", UpdateGivenQtApp)
 	//本地手动安装
-	router.GET("/update/local/lcrtu", UpdateLocalRtuApp)
-	router.GET("/update/local/qt", UpdateLocalQtApp)
+	router.GET("/update/local", UpdateLocalRtuApp)
 
 	err := router.Run(":9876")
 	if err != nil {
