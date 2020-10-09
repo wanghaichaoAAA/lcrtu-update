@@ -93,7 +93,7 @@ func UpdateQtApp(c *gin.Context) {
 func downLatestVersion(gatewayAddr string, updateType string) bool {
 	var (
 		fsize   int64
-		buf     = make([]byte, 1024*1024*1024)
+		buf     = make([]byte, 1024*1024)
 		written int64
 	)
 
@@ -162,14 +162,9 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 	}
 	fmt.Println()
 	fmt.Println("-----------------------下载结束:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
-	//_, err = io.Copy(f, resp.Body)
-	//if err != nil {
-	//	serviceLog.Error("copy resp.Body to ", filePath, " error ", err)
-	//	return false
-	//}
 
-	//fNew, _ := os.Open(filePath)
 	md5 := md5.New()
+	f.Seek(0, 0)
 	_, err = io.Copy(md5, f)
 	if err != nil {
 		serviceLog.Error("generate md5 error ", err)
@@ -177,6 +172,7 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 	}
 	//4.计算下载后的md5值，比较，相等返回true
 	md5Str := hex.EncodeToString(md5.Sum(nil))
+	println("md5:", md5Str)
 	if md5Str != fileMd5Str {
 		serviceLog.Error("verify md5 error ", err)
 		return false
@@ -218,13 +214,13 @@ func MonitoringQTApp() {
 }
 
 func UpdateGivenBackEnd(c *gin.Context) {
-	var buf = make([]byte, 1024*1024*1024)
+	var buf = make([]byte, 1024*1024)
 	var written int64
 	var fsize int64
 	fileId := c.Query("file_id")
 	gateWayAddr := c.Query("gateway_addr")
 	if fileId == "" || gateWayAddr == "" {
-		serviceLog.Error("执行更新脚本出错：参数不能为空")
+		serviceLog.Error("执行更新脚本出错：参数不能为空", ",file_id:", fileId, ",gateway_addr:", gateWayAddr)
 		c.String(http.StatusForbidden, "获取新版文件出错,参数不能为空")
 		return
 	}
@@ -244,9 +240,9 @@ func UpdateGivenBackEnd(c *gin.Context) {
 	}
 
 	//将文件下载到本地,重命名压缩包
-	createFile, err := os.Create(FILE_PATH + "/lcrtu.zip")
-	if err != nil {
-		serviceLog.Error("执行更新脚本出错：", err)
+	createFile, createFileErr := os.Create(FILE_PATH + "/lcrtu.zip")
+	if createFileErr != nil {
+		serviceLog.Error("文件创建失败：", createFileErr)
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
@@ -289,7 +285,7 @@ func UpdateGivenBackEnd(c *gin.Context) {
 }
 
 func UpdateGivenQtApp(c *gin.Context) {
-	var buf = make([]byte, 1024*1024*1024)
+	var buf = make([]byte, 1024*1024)
 	var written int64
 	var fsize int64
 	fileId := c.Query("file_id")
@@ -377,6 +373,7 @@ func UpdateLocalRtuApp(c *gin.Context) {
 		if err != nil {
 			serviceLog.Error("执行更新脚本出错：", err)
 			c.String(http.StatusForbidden, "执行更新脚本出错")
+			return
 		}
 		Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
 		c.String(http.StatusOK, "更新成功")
@@ -388,6 +385,7 @@ func UpdateLocalRtuApp(c *gin.Context) {
 	if err != nil {
 		serviceLog.Error("执行更新脚本出错：", err)
 		c.String(http.StatusForbidden, "执行更新脚本出错")
+		return
 	}
 	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
 	c.String(http.StatusOK, "更新成功")
