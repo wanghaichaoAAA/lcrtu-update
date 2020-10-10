@@ -3,12 +3,10 @@ package service
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -95,7 +93,7 @@ func UpdateQtApp(c *gin.Context) {
 func downLatestVersion(gatewayAddr string, updateType string) bool {
 	var (
 		fsize   int64
-		buf     = make([]byte, 1024*1024*1024)
+		buf     = make([]byte, 1024*1024)
 		written int64
 	)
 
@@ -164,14 +162,9 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 	}
 	fmt.Println()
 	fmt.Println("-----------------------下载结束:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
-	//_, err = io.Copy(f, resp.Body)
-	//if err != nil {
-	//	serviceLog.Error("copy resp.Body to ", filePath, " error ", err)
-	//	return false
-	//}
 
-	//fNew, _ := os.Open(filePath)
 	md5 := md5.New()
+	f.Seek(0, 0)
 	_, err = io.Copy(md5, f)
 	if err != nil {
 		serviceLog.Error("generate md5 error ", err)
@@ -179,6 +172,7 @@ func downLatestVersion(gatewayAddr string, updateType string) bool {
 	}
 	//4.计算下载后的md5值，比较，相等返回true
 	md5Str := hex.EncodeToString(md5.Sum(nil))
+	println("md5:", md5Str)
 	if md5Str != fileMd5Str {
 		serviceLog.Error("verify md5 error ", err)
 		return false
@@ -219,54 +213,65 @@ func MonitoringQTApp() {
 	_ = cmd.Run()
 }
 
-type resStruct struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    []byte `json:"data"`
-}
-
 func UpdateGivenBackEnd(c *gin.Context) {
-
+	var buf = make([]byte, 1024*1024)
+	var written int64
+	var fsize int64
 	fileId := c.Query("file_id")
-	if fileId == "" {
-		serviceLog.Error("执行更新脚本出错：id不能为空")
-		c.String(http.StatusForbidden, "获取新版文件出错,id不能为空")
+	gateWayAddr := c.Query("gateway_addr")
+	if fileId == "" || gateWayAddr == "" {
+		serviceLog.Error("执行更新脚本出错：参数不能为空", ",file_id:", fileId, ",gateway_addr:", gateWayAddr)
+		c.String(http.StatusForbidden, "获取新版文件出错,参数不能为空")
 		return
 	}
 
 	//1.向网关下载特定版本的压缩包
-	getRes, getErr := http.Get("http://172.20.0.70:9002/api/rtu_update/special_version?rtu_id=" + fileId)
+	resp, getErr := http.Get("http://" + gateWayAddr + "/api/rtu_update/special_version?rtu_id=" + fileId)
 	if getErr != nil {
 		serviceLog.Error("执行更新脚本出错：", getErr.Error())
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
-	defer getRes.Body.Close()
-	body, _ := ioutil.ReadAll(getRes.Body)
-	var res resStruct
-	jsonErr := json.Unmarshal(body, &res)
-	if jsonErr != nil {
-		serviceLog.Error("解析数据出错：", jsonErr.Error())
-		c.String(http.StatusForbidden, "解析数据出错")
+	defer resp.Body.Close()
+	fsize, contentLengthErr := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 32)
+	if contentLengthErr != nil {
+		serviceLog.Error("获取Content-Length失败：", contentLengthErr)
 		return
 	}
 
 	//将文件下载到本地,重命名压缩包
-	out, err := os.Create(FILE_PATH + "/lcrtu.zip")
-	if err != nil {
-		serviceLog.Error("执行更新脚本出错：", err)
+	createFile, createFileErr := os.Create(FILE_PATH + "/lcrtu.zip")
+	if createFileErr != nil {
+		serviceLog.Error("文件创建失败：", createFileErr)
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
-	defer out.Close()
+	defer createFile.Close()
 
-	writeCount, writeErr := out.Write(res.Data)
-	println("写入数量：", writeCount)
-	if writeErr != nil {
-		serviceLog.Error("执行写入出错：", writeErr)
-		c.String(http.StatusForbidden, "获取新版文件出错")
-		return
+	fmt.Println("-----------------------开始下载:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
+	for {
+		nr, err := resp.Body.Read(buf)
+		if (err != nil && err != io.EOF) || nr <= 0 {
+			break
+		}
+		nw, ew := createFile.Write(buf[0:nr])
+		//写入出错
+		if ew != nil {
+			serviceLog.Error("写入本地文件出错：", err)
+			break
+		}
+		//读取是数据长度不等于写入的数据长度
+		if nr != nw {
+			serviceLog.Error("写入本地文件的数据长度出错")
+			break
+		}
+		if nw > 0 {
+			written += int64(nw)
+		}
+		fmt.Print(fmt.Sprintf("%.0f", float32(written)/float32(fsize)*100), "% ")
 	}
+	fmt.Println()
+	fmt.Println("-----------------------下载结束:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
 
 	//3.执行更新脚本
 	command := "./scripts/update_backend.sh"
@@ -280,47 +285,65 @@ func UpdateGivenBackEnd(c *gin.Context) {
 }
 
 func UpdateGivenQtApp(c *gin.Context) {
+	var buf = make([]byte, 1024*1024)
+	var written int64
+	var fsize int64
 	fileId := c.Query("file_id")
-	if fileId == "" {
-		serviceLog.Error("执行更新脚本出错：id不能为空")
-		c.String(http.StatusForbidden, "获取新版文件出错,id不能为空")
+	gateWayAddr := c.Query("gateway_addr")
+	if fileId == "" || gateWayAddr == "" {
+		serviceLog.Error("执行更新脚本出错：参数不能为空")
+		c.String(http.StatusForbidden, "获取新版文件出错,参数不能为空")
 		return
 	}
 
 	//1.向网关下载特定版本的压缩包
-	getRes, getErr := http.Get("http://172.20.0.70:9002/api/qt_update/special_version?qt_id=" + fileId)
+	resp, getErr := http.Get("http://" + gateWayAddr + "/api/qt_update/special_version?qt_id=" + fileId)
 	if getErr != nil {
 		serviceLog.Error("执行更新脚本出错：", getErr.Error())
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
-	defer getRes.Body.Close()
-	body, _ := ioutil.ReadAll(getRes.Body)
-	var res resStruct
-	jsonErr := json.Unmarshal(body, &res)
-	if jsonErr != nil {
-		serviceLog.Error("解析数据出错：", jsonErr.Error())
-		c.String(http.StatusForbidden, "解析数据出错")
+	defer resp.Body.Close()
+	fsize, contentLengthErr := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 32)
+	if contentLengthErr != nil {
+		serviceLog.Error("获取Content-Length失败：", contentLengthErr)
 		return
 	}
 
 	//将文件下载到本地,重命名压缩包
-	out, err := os.Create(FILE_PATH + "/qtApp.zip")
+	createFile, err := os.Create(FILE_PATH + "/qtApp.zip")
 	if err != nil {
 		serviceLog.Error("执行更新脚本出错：", err)
 		c.String(http.StatusForbidden, "获取新版文件出错")
 		return
 	}
-	defer out.Close()
+	defer createFile.Close()
 
-	writeCount, writeErr := out.Write(res.Data)
-	println("写入数量：", writeCount)
-	if writeErr != nil {
-		serviceLog.Error("执行写入出错：", writeErr)
-		c.String(http.StatusForbidden, "获取新版文件出错")
-		return
+	fmt.Println("-----------------------开始下载:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
+	for {
+		nr, err := resp.Body.Read(buf)
+		if (err != nil && err != io.EOF) || nr <= 0 {
+			break
+		}
+		nw, ew := createFile.Write(buf[0:nr])
+		//写入出错
+		if ew != nil {
+			serviceLog.Error("写入本地文件出错：", err)
+			break
+		}
+		//读取是数据长度不等于写入的数据长度
+		if nr != nw {
+			serviceLog.Error("写入本地文件的数据长度出错")
+			break
+		}
+		if nw > 0 {
+			written += int64(nw)
+		}
+		fmt.Print(fmt.Sprintf("%.0f", float32(written)/float32(fsize)*100), "% ")
 	}
-
+	fmt.Println()
+	fmt.Println("-----------------------下载结束:", time.Now().Format("2006-01-02 15:04:05"), "-----------------------")
+	Get().DelByID("MonitoringQTApp")
 	//3.执行更新脚本
 	command := "./scripts/update_qt.sh"
 	execErr := exec.Command("/bin/bash", "-c", command).Run()
@@ -329,29 +352,40 @@ func UpdateGivenQtApp(c *gin.Context) {
 		c.String(http.StatusForbidden, "执行更新脚本出错")
 		return
 	}
+	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
 	c.String(http.StatusOK, "更新成功")
 }
 
+//数采仪本地安装
 func UpdateLocalRtuApp(c *gin.Context) {
-	//3.升级程序
+
+	fileType := c.Query("file_type")
+	if fileType == "" {
+		c.String(http.StatusOK, "file_type error")
+		return
+	}
+
+	//qt
+	if fileType == "qt" {
+		Get().DelByID("MonitoringQTApp")
+		command := "./scripts/update_qt.sh"
+		err := exec.Command("/bin/bash", "-c", command).Run()
+		if err != nil {
+			serviceLog.Error("执行更新脚本出错：", err)
+			c.String(http.StatusForbidden, "执行更新脚本出错")
+			return
+		}
+		Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
+		c.String(http.StatusOK, "更新成功")
+		return
+	}
+	//数采仪
 	command := "./scripts/update_backend.sh"
 	err := exec.Command("/bin/bash", "-c", command).Run()
 	if err != nil {
 		serviceLog.Error("执行更新脚本出错：", err)
 		c.String(http.StatusForbidden, "执行更新脚本出错")
-	}
-	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
-	c.String(http.StatusOK, "更新成功")
-}
-
-func UpdateLocalQtApp(c *gin.Context) {
-	Get().DelByID("MonitoringQTApp")
-	//3.升级程序
-	command := "./scripts/update_qt.sh"
-	err := exec.Command("/bin/bash", "-c", command).Run()
-	if err != nil {
-		serviceLog.Error("执行更新脚本出错：", err)
-		c.String(http.StatusForbidden, "执行更新脚本出错")
+		return
 	}
 	Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
 	c.String(http.StatusOK, "更新成功")
