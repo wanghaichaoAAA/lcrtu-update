@@ -16,12 +16,10 @@ func StartHttp() {
 	router.GET("/update/given/qt", UpdateGivenQtApp)
 	//本地手动安装
 	router.GET("/update/local", UpdateLocalRtuApp)
-
+	serviceLog.Info("lcrtu更新服务启动成功,端口:9876")
 	err := router.Run(":9876")
 	if err != nil {
-		serviceLog.Info("start http server error")
+		serviceLog.Warn("lcrtu更新服务启动失败:", err)
 		os.Exit(1)
-	} else {
-		serviceLog.Info("start http server success,listen at:9876")
 	}
 }
