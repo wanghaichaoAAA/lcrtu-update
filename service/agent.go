@@ -73,16 +73,18 @@ func stopAgent() {
 	command := exec.Command("/bin/bash", "-c", "./stop_n2n.sh")
 	command.Start()
 	agentUsed = false
+	agentIP = ""
+	agentStartTime = time.Time{}
 	serviceLog.Error("关闭代理成功", "agentIP:", agentIP)
 }
 
 //状态
 func agentStatus(c *gin.Context) {
-	agentStatus := "关闭"
-	if agentUsed {
-		agentStatus = "开启"
+	agentStatus := "开启"
+	if !agentUsed {
+		agentStatus = "关闭"
 	}
-	resStr := agentStatus + "," + agentIP + "," + agentStartTime.String()
+	resStr := agentStatus + "," + agentIP + "," + agentStartTime.Format("2006-01-02 15:04:05")
 	serviceLog.Error("获取代理信息成功", "agentIP:", agentIP)
 	c.String(http.StatusOK, resStr)
 }
