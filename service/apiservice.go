@@ -16,6 +16,9 @@ func StartHttp() {
 	router.GET("/update/given/qt", UpdateGivenQtApp)
 	//本地手动安装
 	router.GET("/update/local", UpdateLocalRtuApp)
+	//代理管理
+	router.GET("/update/agent", AgentManage)
+	router.GET("/update/agent/status", agentStatus) //代理状态
 	serviceLog.Info("lcrtu更新服务启动成功,端口:9876")
 	err := router.Run(":9876")
 	if err != nil {
