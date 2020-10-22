@@ -53,9 +53,10 @@ func AgentManage(c *gin.Context) {
 
 //开启代理
 func startAgent(agentAddr string, serverAddr string) error {
-	exec.Command("/usr/local/workspace/lcrtu-update/scripts/tun.ko").Start()
+	exec.Command("/bin/bash", "-c", "./stop_n2n.sh").Start()
+	exec.Command("insmod /mnt/mmc/lcrtu/scripts/tun.ko").Start()
 	params := "-d n2n0 -c blockchain -k 123456 -a " + agentAddr + " -l " + serverAddr
-	command := exec.Command("/usr/local/workspace/lcrtu-update/scripts/edge", params)
+	command := exec.Command("/mnt/mmc/lcrtu/scripts/edge", params)
 	err := command.Start()
 	if err != nil {
 		serviceLog.Error("开启代理失败", err.Error(), "agentIP:", agentAddr, "serverIP:", serverAddr)
