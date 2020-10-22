@@ -53,11 +53,9 @@ func AgentManage(c *gin.Context) {
 
 //开启代理
 func startAgent(agentAddr string, serverAddr string) error {
-	exec.Command("/bin/bash", "-c", "./stop_n2n.sh").Start()
-	exec.Command("insmod /mnt/mmc/lcrtu/scripts/tun.ko").Start()
-	params := "-d n2n0 -c blockchain -k 123456 -a " + agentAddr + " -l " + serverAddr
-	command := exec.Command("/mnt/mmc/lcrtu/scripts/edge", params)
-	err := command.Start()
+	exec.Command("/bin/bash", "-c", "/mnt/mmc/lcrtu/scripts/stop_n2n.sh").Run()
+	exec.Command("/bin/bash", "-c", "/mnt/mmc/lcrtu/scripts/add_ko.sh").Run()
+	err := exec.Command("/bin/bash", "-c", "/mnt/mmc/lcrtu/scripts/start_edge.sh "+agentAddr+" "+serverAddr).Run()
 	if err != nil {
 		serviceLog.Error("开启代理失败", err.Error(), "agentIP:", agentAddr, "serverIP:", serverAddr)
 		return err
@@ -71,8 +69,8 @@ func startAgent(agentAddr string, serverAddr string) error {
 
 //关闭代理
 func stopAgent() {
-	command := exec.Command("/bin/bash", "-c", "./stop_n2n.sh")
-	command.Start()
+	command := exec.Command("/bin/bash", "-c", "/mnt/mmc/lcrtu/scripts/stop_n2n.sh")
+	command.Run()
 	agentUsed = false
 	agentIP = ""
 	agentStartTime = time.Time{}
