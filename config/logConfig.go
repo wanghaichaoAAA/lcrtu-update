@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	filePath := "./log/lcrtu-update.log.%Y%m%d%H%M"
+	filePath := "/mnt/mmc/lcrtu/log/lcrtu-update.log.%Y%m%d%H%M"
 	fileWriter, err := rotatelogs.New(
 		filePath,
 		rotatelogs.WithLinkName(filePath), // 生成软链，指向最新日志文件
