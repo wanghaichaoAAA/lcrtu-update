@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
-	//service.Get().Start()
+	service.Get().Start()
+	service.Get().AddByFunc("MonitoringQTApp", 5, func() { service.MonitoringQTApp() })
 	service.StartHttp()
 }
