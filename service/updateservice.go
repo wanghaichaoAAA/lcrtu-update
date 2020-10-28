@@ -92,10 +92,6 @@ func updateAndInstall(gatewayAddr string, buildAt time.Time, updateType string) 
 	command := "./scripts/update_backend.sh"
 	if updateType == "qtApp" {
 		command = "./scripts/update_qt.sh"
-		Get().DelByID("MonitoringQTApp")
-		defer func() {
-			Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
-		}()
 	}
 	//执行升级脚本
 	err := exec.Command("/bin/bash", "-c", command).Run()
@@ -221,14 +217,6 @@ func checkBackEndVersion(gatewayAddr string, buildAt time.Time, updateType strin
 	}
 	return false
 }
-func MonitoringQTApp() {
-	if existQtAppPid() {
-		return
-	}
-	command := "./scripts/start_qtApp.sh"
-	cmd := exec.Command("/bin/bash", "-c", command)
-	cmd.Run()
-}
 
 func existQtAppPid() bool {
 	var outInfo bytes.Buffer
@@ -236,7 +224,7 @@ func existQtAppPid() bool {
 	cmd := exec.Command("/bin/bash", "-c", command)
 	cmd.Stdout = &outInfo
 	cmd.Run()
-	if outInfo.Len() != 0 && outInfo.String() != "<nil>" {
+	if outInfo.Len() > 5 && outInfo.String() != "<nil>" {
 		return true
 	}
 	return false
@@ -341,10 +329,6 @@ func downloadAndInstall(gateWayAddr, downloadType, fileId string) bool {
 	command := "./scripts/update_backend.sh"
 	if downloadType == UPDATE_TYPE_QT {
 		command = "./scripts/update_qt.sh"
-		Get().DelByID("MonitoringQTApp")
-		defer func() {
-			Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
-		}()
 	}
 	execErr := exec.Command("/bin/bash", "-c", command).Run()
 	if execErr != nil {
@@ -363,7 +347,6 @@ func UpdateLocalRtuApp(c *gin.Context) {
 	}
 	//qt
 	if fileType == "qt" {
-		Get().DelByID("MonitoringQTApp")
 		command := "./scripts/update_qt.sh"
 		err := exec.Command("/bin/bash", "-c", command).Run()
 		if err != nil {
@@ -371,7 +354,6 @@ func UpdateLocalRtuApp(c *gin.Context) {
 			c.String(http.StatusForbidden, "执行更新脚本出错")
 			return
 		}
-		Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
 		c.String(http.StatusOK, "更新成功")
 		return
 	}
