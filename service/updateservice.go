@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -90,7 +91,7 @@ func updateAndInstall(gatewayAddr string, buildAt time.Time, updateType string) 
 	}
 	command := "./scripts/update_backend.sh"
 	if updateType == "qtApp" {
-		command = "./scripts/update_backend.sh"
+		command = "./scripts/update_qt.sh"
 		Get().DelByID("MonitoringQTApp")
 		defer func() {
 			Get().AddByFunc("MonitoringQTApp", 5, func() { MonitoringQTApp() })
@@ -221,9 +222,24 @@ func checkBackEndVersion(gatewayAddr string, buildAt time.Time, updateType strin
 	return false
 }
 func MonitoringQTApp() {
-	command := "./scripts/monitor_qt.sh"
+	if existQtAppPid() {
+		return
+	}
+	command := "./scripts/start_qtApp.sh"
 	cmd := exec.Command("/bin/bash", "-c", command)
-	_ = cmd.Run()
+	cmd.Run()
+}
+
+func existQtAppPid() bool {
+	var outInfo bytes.Buffer
+	command := "./scripts/pid_atApp.sh"
+	cmd := exec.Command("/bin/bash", "-c", command)
+	cmd.Stdout = &outInfo
+	cmd.Run()
+	if outInfo.Len() != 0 && outInfo.String() != "<nil>" {
+		return true
+	}
+	return false
 }
 
 func UpdateGivenBackEnd(c *gin.Context) {
