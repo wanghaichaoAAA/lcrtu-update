@@ -18,20 +18,13 @@ unzipQtApp(){
 }
 
 
-APP_NAME=qtApp
-pid=`ps -ef|grep $APP_NAME|grep -v grep|awk '{print $2}' `
 unzipQtApp
 if [ $? -eq "1" ]; then
   echo "解压qtApp.zip失败"
   exit 1
 fi
 
-#杀死qtApp进程
-if [ -z "${pid}" ]; then
-  echo "qtApp is not running "
-else
- kill -9 ${pid}
-fi
+systemctl stop qtApp
 
 cd /mnt/mmc/lcrtu
 rm -f qtApp-bak
@@ -41,4 +34,7 @@ cp /mnt/mmc/tmp/qtApp/qtApp /mnt/mmc/lcrtu
 
 chmod 777 qtApp
 
-./qtApp &
+systemctl start qtApp
+
+rm -rf /mnt/mmc/tmp/qtApp.zip
+rm -rf /mnt/mmc/tmp/qtApp
