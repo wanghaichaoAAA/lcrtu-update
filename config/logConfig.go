@@ -10,12 +10,12 @@ import (
 )
 
 func init() {
-	filePath := "/mnt/mmc/lcrtu/log/lcrtu-update.log-%Y%m%d%H%M"
+	filePath := "./log/lcrtu-update.log-%Y%m%d%H%M"
 	fileWriter, err := rotatelogs.New(
 		filePath,
-		rotatelogs.WithLinkName("/mnt/mmc/lcrtu/log/lcrtu-update.log"), // 生成软链，指向最新日志文件
-		rotatelogs.WithMaxAge(time.Hour*24*time.Duration(30)),          // 文件最大保存时间
-		rotatelogs.WithRotationTime(time.Hour*24*time.Duration(7)),     // 日志切割时间间隔
+		rotatelogs.WithLinkName("./log/lcrtu-update.log"),          // 生成软链，指向最新日志文件
+		rotatelogs.WithMaxAge(time.Hour*24*time.Duration(30)),      // 文件最大保存时间
+		rotatelogs.WithRotationTime(time.Hour*24*time.Duration(7)), // 日志切割时间间隔
 	)
 	if err != nil {
 		fmt.Println("初始化日志失败")
