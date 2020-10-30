@@ -17,6 +17,7 @@ unzipQtApp(){
   fi
 }
 
+
 unzipQtApp
 if [ $? -eq "1" ]; then
   echo "解压qtApp.zip失败"
@@ -34,3 +35,6 @@ cp /mnt/mmc/tmp/qtApp/qtApp /mnt/mmc/lcrtu
 chmod 777 qtApp
 
 systemctl start qtApp
+
+rm -rf /mnt/mmc/tmp/qtApp.zip
+rm -rf /mnt/mmc/tmp/qtApp

@@ -224,7 +224,7 @@ func existQtAppPid() bool {
 	cmd := exec.Command("/bin/bash", "-c", command)
 	cmd.Stdout = &outInfo
 	cmd.Run()
-	if outInfo.Len() > 5 && outInfo.String() != "<nil>" {
+	if outInfo.Len() != 0 && outInfo.String() != "<nil>" {
 		return true
 	}
 	return false

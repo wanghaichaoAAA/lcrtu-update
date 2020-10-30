@@ -10,6 +10,5 @@ import (
 )
 
 func main() {
-	//service.Get().Start()
 	service.StartHttp()
 }
