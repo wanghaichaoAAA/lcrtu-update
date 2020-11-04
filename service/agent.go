@@ -63,7 +63,7 @@ func startAgent(agentAddr string, serverAddr string) error {
 	agentStartTime = time.Now()
 	agentIP = agentAddr
 	serviceLog.Error("开启代理成功", "agentIP:", agentIP, "serverIP:", serverAddr)
-	time.AfterFunc(time.Duration(2)*time.Hour, stopAgent)
+	time.AfterFunc(time.Duration(4)*time.Hour, stopAgent)
 	return nil
 }
 
