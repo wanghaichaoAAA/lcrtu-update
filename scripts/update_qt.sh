@@ -4,17 +4,12 @@ unzipQtApp(){
   cd /mnt/mmc/tmp
   rm -rf /mnt/mmc/tmp/qtApp
   unzip qtApp.zip
-  if [ ! -d "/mnt/mmc/tmp/qtApp/" ];then
-    echo "qtApp.zip 不存在/mnt/mmc/tmp/qtApp路径"
-    return 1
-  else
-    if [ ! -f "/mnt/mmc/tmp/qtApp/qtApp" ];then
-      echo "qtApp.zip 不存在/mnt/mmc/tmp/qtApp/qtApp可执行文件"
+  if [ ! -f "/mnt/mmc/tmp/qtApp" ];then
+   echo "qtApp.zip 不存在/mnt/mmc/tmp/qtApp可执行文件"
       return 1
     else
       return 0
     fi
-  fi
 }
 
 
@@ -30,7 +25,7 @@ cd /mnt/mmc/lcrtu
 rm -f qtApp-bak
 mv qtApp qtApp-bak
 
-cp /mnt/mmc/tmp/qtApp/qtApp /mnt/mmc/lcrtu
+cp /mnt/mmc/tmp/qtApp /mnt/mmc/lcrtu
 
 chmod 777 qtApp
 
