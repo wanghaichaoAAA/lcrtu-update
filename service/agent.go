@@ -46,7 +46,7 @@ func AgentManage(c *gin.Context) {
 			c.String(http.StatusForbidden, "err:代理已关闭")
 			return
 		}
-		stopAgent()
+		stopAgent(agentStartTime)
 	}
 	c.String(http.StatusOK, operation+"成功")
 }
@@ -60,15 +60,22 @@ func startAgent(agentAddr string, serverAddr string) error {
 		serviceLog.Error("开启代理失败", err.Error(), "agentIP:", agentAddr, "serverIP:", serverAddr)
 		return err
 	}
-	agentStartTime = time.Now()
+	newStartTime := time.Now()
+	agentStartTime = newStartTime
 	agentIP = agentAddr
 	serviceLog.Error("开启代理成功", "agentIP:", agentIP, "serverIP:", serverAddr)
-	time.AfterFunc(time.Duration(4)*time.Hour, stopAgent)
+	time.AfterFunc(time.Duration(4)*time.Hour, func() {
+		stopAgent(newStartTime)
+	})
 	return nil
 }
 
 //关闭代理
-func stopAgent() {
+func stopAgent(startTime time.Time) {
+	if startTime.Unix() != agentStartTime.Unix() {
+		serviceLog.Error("关闭代理失败", "时间:", startTime)
+		return
+	}
 	command := exec.Command("/bin/bash", "-c", "/mnt/mmc/lcrtu/scripts/stop_n2n.sh")
 	command.Run()
 	agentUsed = false
